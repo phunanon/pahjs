@@ -4,20 +4,19 @@ function fitCanvasToWindow(ctx: CanvasRenderingContext2D) {
   const dpr = window.devicePixelRatio || 1;
 
   // CSS size (layout)
-  const cssWidth  = window.innerWidth;
+  const cssWidth = window.innerWidth;
   const cssHeight = window.innerHeight;
 
   // Backing store size (actual pixels)
-  ctx.canvas.width  = Math.round(cssWidth  * dpr);
+  ctx.canvas.width = Math.round(cssWidth * dpr);
   ctx.canvas.height = Math.round(cssHeight * dpr);
 
   // Ensure the canvas fills the viewport
-  ctx.canvas.style.width  = cssWidth  + "px";
-  ctx.canvas.style.height = cssHeight + "px";
+  ctx.canvas.style.width = cssWidth + 'px';
+  ctx.canvas.style.height = cssHeight + 'px';
 
-  const t = ctx.getTransform();
+  // Set the transform to scale by DPR
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.transform(t.a, t.b, t.c, t.d, t.e, t.f);
 }
 
 async function createApp() {

@@ -222,12 +222,13 @@ export const Render = (ctx: CanvasRenderingContext2D) => {
   ctx.save();
   const margin = 20;
   const troughHeight = tileHeight + margin * 2;
-  //Scale to fill shortest dimension
+  // Scale to fill shortest dimension, accounting for DPR already applied
   const gameWidth = tileWidth * boardLength + margin * 2;
   const gameHeight = tileHeight * boardLength + troughHeight + margin * 3;
+  const dpr = window.devicePixelRatio || 1;
   const scale = Math.min(
-    ctx.canvas.width / gameWidth,
-    ctx.canvas.height / gameHeight,
+    (ctx.canvas.width / dpr) / gameWidth,
+    (ctx.canvas.height / dpr) / gameHeight,
   );
   ctx.scale(scale, scale);
 

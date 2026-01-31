@@ -4,6 +4,8 @@ Implementation of [Mahjong Solitaire](https://en.wikipedia.org/wiki/Mahjong_soli
 
 Unlike most Mahjong Solitaire games, this one has some kind of trough which allows you to put up to three tiles aside to later match, which leads to much more strategic play.
 
+I made Mahjong Solitaire in the past too: [Pahjong](https://github.com/phunanon/Pahjong).
+
 ![Pahjs screenshot](Pahjs-screenshot.png)
 
 ```bash
