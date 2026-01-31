@@ -1,0 +1,15 @@
+{
+  "name": "pahjs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@8.6.0",
+  "scripts": {
+    "start": "vite",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vite": "^5.1.0"
+  }
+}
