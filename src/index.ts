@@ -27,8 +27,6 @@ async function createApp() {
     return;
   }
 
-  canvas.style.touchAction = 'none';
-
   const onResize = () => {
     fitCanvasToWindow(ctx);
     Render(ctx);

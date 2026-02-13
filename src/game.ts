@@ -13,6 +13,7 @@ type BoardTile = Tile & {
   y: number;
   z: number;
 };
+let difficulty: 'easy' | 'hard' = 'easy';
 const trough: Tile[] = [];
 const board: BoardTile[] = [];
 const mouse = { x: 0, y: 0, clicked: false };
@@ -41,7 +42,8 @@ export const InitGame = async (ctx: CanvasRenderingContext2D) => {
   const orderedAssets = [...document.querySelectorAll('img')];
   shuffle(orderedAssets);
   assets.push(...orderedAssets.flatMap(x => [x, x]));
-  shuffle(assets, 1);
+  difficulty = confirm('Hard mode?') ? 'hard' : 'easy';
+  shuffle(assets, difficulty === 'hard' ? 2 : 1);
   assets.push(...assets, ...assets, ...assets);
 
   {
@@ -194,17 +196,18 @@ const CalcClickable = () => {
 
 const HandleClick = () => {
   const clicked = board.find(tile => tile.highlight);
-  if (!clicked?.clickable || trough.length === 4) return;
-  //Remove similar from the trough if any
+  if (!clicked?.clickable) return;
+  const boardIdx = board.indexOf(clicked);
   const troughIdx = trough.findIndex(t => t.asset.src === clicked.asset.src);
-  if (troughIdx >= 0) {
-    trough.splice(troughIdx, 1);
-  } else {
+  if (troughIdx === -1) {
+    if (trough.length === (difficulty ? 4 : 3)) {
+      return;
+    }
     trough.push({ asset: clicked.asset });
+  } else {
+    trough.splice(troughIdx, 1);
   }
-  //Remove from board
-  const idx = board.indexOf(clicked);
-  if (idx >= 0) board.splice(idx, 1);
+  board.splice(boardIdx, 1);
 };
 
 let introduction = 0;
@@ -227,8 +230,8 @@ export const Render = (ctx: CanvasRenderingContext2D) => {
   const gameHeight = tileHeight * boardLength + troughHeight + margin * 3;
   const dpr = window.devicePixelRatio || 1;
   const scale = Math.min(
-    (ctx.canvas.width / dpr) / gameWidth,
-    (ctx.canvas.height / dpr) / gameHeight,
+    ctx.canvas.width / dpr / gameWidth,
+    ctx.canvas.height / dpr / gameHeight,
   );
   ctx.scale(scale, scale);
 
@@ -236,10 +239,11 @@ export const Render = (ctx: CanvasRenderingContext2D) => {
   ctx.fillStyle = '#654321';
   ctx.strokeStyle = '#442d15';
   ctx.lineWidth = 2;
-  const troughWidth = (tileWidth + margin * 2) * 4;
+  const troughSlots = difficulty === 'hard' ? 4 : 3;
+  const troughWidth = (tileWidth + margin * 2) * troughSlots;
   const troughX = gameWidth / 2 - troughWidth / 2;
   const tileSpace = tileWidth + margin * 2;
-  for (let i = 0; i < 4; ++i) {
+  for (let i = 0; i < troughSlots; ++i) {
     ctx.save();
     ctx.translate(troughX + i * tileSpace, 0);
     ctx.fillRect(0, margin, tileWidth + margin * 2, troughHeight);
