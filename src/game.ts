@@ -7,8 +7,10 @@ type Tile = {
   highlight?: boolean;
 };
 type BoardTile = Tile & {
-  clientX: number;
-  clientY: number;
+  clientLeft: number;
+  clientTop: number;
+  clientRight: number;
+  clientBottom: number;
   x: number;
   y: number;
   z: number;
@@ -22,7 +24,7 @@ const boardLength = 8;
 const tileWidth = 64;
 const tileHeight = 96;
 const faceX = 4;
-const faceY = 4;
+const faceY = -4;
 
 const shuffle = <T>(xs: T[], k = 0) => {
   const alreadyShuffled = new Set<number>();
@@ -61,7 +63,11 @@ export const InitGame = async (ctx: CanvasRenderingContext2D) => {
       const sp = [...space][spaceIdx];
       if (!sp) break;
       const s = obj(sp);
-      board.push({ asset, x: s.x, y: s.y, z: s.z, clientX: 0, clientY: 0 });
+      const client = {
+        ...{ clientLeft: 0, clientTop: 0 },
+        ...{ clientRight: 0, clientBottom: 0 },
+      };
+      board.push({ asset, x: s.x, y: s.y, z: s.z, ...client });
       occupied.add(sp);
       if (s.x > s.z * 2 && s.y > s.z * 2) {
         if (has(s, -2, 0) && has(s, -2, -2) && has(s, 0, -2))
@@ -89,14 +95,14 @@ export const InitGame = async (ctx: CanvasRenderingContext2D) => {
     }
   }
 
-  ctx.canvas.addEventListener('mousemove', e => {
-    mouse.x = e.clientX;
-    mouse.y = e.clientY;
+  ctx.canvas.addEventListener('pointermove', e => {
+    const rect = ctx.canvas.getBoundingClientRect();
+    mouse.x = (e.clientX - rect.left) * (ctx.canvas.width / rect.width);
+    mouse.y = (e.clientY - rect.top) * (ctx.canvas.height / rect.height);
   });
-  ctx.canvas.addEventListener('mousedown', () => {
+  ctx.canvas.addEventListener('pointerdown', () => {
     mouse.clicked = true;
   });
-
   CalcClickable();
 };
 
@@ -111,7 +117,7 @@ const RenderTile = (
   ctx.lineWidth = 1;
   ctx.strokeStyle = '#000';
   ctx.translate((x / 2) * tileWidth, (y / 2) * tileHeight);
-  ctx.translate(z * faceX, z * -faceY);
+  ctx.translate(z * faceX, z * faceY);
 
   const highlight = tile.highlight && tile.clickable;
   //Left side
@@ -119,8 +125,8 @@ const RenderTile = (
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(0, tileHeight);
-  ctx.lineTo(faceX, tileHeight - faceY);
-  ctx.lineTo(faceX, -faceY);
+  ctx.lineTo(faceX, tileHeight + faceY);
+  ctx.lineTo(faceX, faceY);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
@@ -128,8 +134,8 @@ const RenderTile = (
   ctx.fillStyle = highlight ? '#080' : '#ccc';
   ctx.beginPath();
   ctx.moveTo(0, tileHeight);
-  ctx.lineTo(faceX, tileHeight - faceY);
-  ctx.lineTo(tileWidth + faceX, tileHeight - faceY);
+  ctx.lineTo(faceX, tileHeight + faceY);
+  ctx.lineTo(tileWidth + faceX, tileHeight + faceY);
   ctx.lineTo(tileWidth, tileHeight);
   ctx.closePath();
   ctx.fill();
@@ -137,29 +143,34 @@ const RenderTile = (
 
   //Background
   ctx.fillStyle = highlight ? '#aaffbb' : '#fffadb';
-  ctx.fillRect(faceX, -faceY, tileWidth, tileHeight);
+  ctx.fillRect(faceX, faceY, tileWidth, tileHeight);
   //Border
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 1;
-  ctx.strokeRect(faceX, -faceY, tileWidth, tileHeight);
+  ctx.strokeRect(faceX, faceY, tileWidth, tileHeight);
   //Tile image
   ctx.drawImage(
     tile.asset,
     faceX + 2,
-    -faceY + 2,
+    faceY + 2,
     tileWidth - faceX,
-    tileHeight - faceY,
+    tileHeight + faceY,
   );
-  const point = new DOMPoint(0, 0).matrixTransform(ctx.getTransform());
-  if ('clientX' in tile) {
-    tile.clientX = point.x;
-    tile.clientY = point.y;
+  const t = (x: number, y: number) =>
+    new DOMPoint(x, y).matrixTransform(ctx.getTransform());
+  const topLeft = t(faceX, faceY);
+  const bottomRight = t(tileWidth + faceX, tileHeight);
+  if ('clientLeft' in tile) {
+    tile.clientLeft = topLeft.x;
+    tile.clientTop = topLeft.y;
+    tile.clientRight = bottomRight.x;
+    tile.clientBottom = bottomRight.y;
 
     // //Euclidean distance brightening effect
     // //by darkening farther tiles
     // const distance = hypot(
     //   mouse.x - (tile.clientX + (tileWidth - faceX) / 2),
-    //   mouse.y - (tile.clientY + (tileHeight - faceY) / 2),
+    //   mouse.y - (tile.clientY + (tileHeight + faceY) / 2),
     // );
     // const maxDistance = 300;
     // const clamped = min(distance, maxDistance);
@@ -167,7 +178,7 @@ const RenderTile = (
     // ctx.fillStyle = `rgba(0,0,0,${darkness / 255})`;
     const maxZ = 4;
     ctx.fillStyle = `rgba(0,0,0,${(maxZ - tile.z) / (maxZ * 4)})`;
-    ctx.fillRect(faceX, -faceY, tileWidth, tileHeight);
+    ctx.fillRect(faceX, faceY, tileWidth, tileHeight);
   }
 
   ctx.restore();
@@ -261,13 +272,11 @@ export const Render = (ctx: CanvasRenderingContext2D) => {
     .reduce(
       (under, tile) => {
         tile.highlight = false;
-        const clientX = tile.clientX ?? 0;
-        const clientY = tile.clientY ?? 0;
         const isUnder =
-          mouse.x >= clientX &&
-          mouse.x <= clientX + (tileWidth + faceX) * scale &&
-          mouse.y >= clientY - faceY * scale &&
-          mouse.y <= clientY + tileHeight * scale;
+          mouse.x >= tile.clientLeft &&
+          mouse.x <= tile.clientRight &&
+          mouse.y >= tile.clientTop &&
+          mouse.y <= tile.clientBottom;
         if (!isUnder) return under;
         if (under) return tile.z > under.z ? tile : under;
         return tile;
