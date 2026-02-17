@@ -38,12 +38,6 @@ async function createApp() {
   fitCanvasToWindow(ctx);
 
   await InitGame(ctx);
-  const loop = () => {
-    Render(ctx);
-    requestAnimationFrame(loop);
-  };
-
-  loop();
 }
 
 if (document.readyState === 'loading') {

@@ -16,7 +16,7 @@ type BoardTile = Tile & {
   y: number;
   z: number;
 };
-let difficulty: 'easy' | 'hard' = 'easy';
+const init = { difficulty: 'easy' as 'easy' | 'hard', loadedMs: 0 };
 const trough: Tile[] = [];
 const board: BoardTile[] = [];
 
@@ -40,8 +40,7 @@ const shuffle = <T>(xs: T[], k = 0) => {
   }
 };
 
-const handlePointer = (ctx: Ctx, click: boolean) => (e: PointerEvent) => {
-  //TODO: this could be done only once the board changes
+const CalcClickable = () => {
   for (const tile of board) {
     const topBlocked = board.some(
       other =>
@@ -60,7 +59,9 @@ const handlePointer = (ctx: Ctx, click: boolean) => (e: PointerEvent) => {
     );
     tile.clickable = !topBlocked && neighbours.length < 2;
   }
+};
 
+const handlePointer = (ctx: Ctx, click: boolean) => (e: PointerEvent) => {
   const rect = ctx.canvas.getBoundingClientRect();
   const x = (e.clientX - rect.left) * (ctx.canvas.width / rect.width);
   const y = (e.clientY - rect.top) * (ctx.canvas.height / rect.height);
@@ -88,7 +89,7 @@ const handlePointer = (ctx: Ctx, click: boolean) => (e: PointerEvent) => {
     const boardIdx = board.indexOf(underMouse);
     const troughIdx = trough.findIndex(t => t.asset.src === asset.src);
     if (troughIdx === -1) {
-      if (trough.length === (difficulty ? 4 : 3)) {
+      if (trough.length === (init.difficulty ? 4 : 3)) {
         return;
       }
       trough.push({ asset });
@@ -96,6 +97,13 @@ const handlePointer = (ctx: Ctx, click: boolean) => (e: PointerEvent) => {
       trough.splice(troughIdx, 1);
     }
     board.splice(boardIdx, 1);
+    CalcClickable();
+    Render(ctx);
+  } else {
+    const key = underMouse
+      ? { ...underMouse, asset: underMouse.asset.src }
+      : '';
+    Render(ctx, JSON.stringify(key));
   }
 };
 
@@ -103,8 +111,8 @@ export const InitGame = async (ctx: CanvasRenderingContext2D) => {
   const orderedAssets = [...document.querySelectorAll('img')];
   shuffle(orderedAssets);
   assets.push(...orderedAssets.flatMap(x => [x, x]));
-  difficulty = confirm('Hard mode?') ? 'hard' : 'easy';
-  shuffle(assets, difficulty === 'hard' ? 2 : 1);
+  init.difficulty = confirm('Hard mode?') ? 'hard' : 'easy';
+  shuffle(assets, init.difficulty === 'hard' ? 2 : 1);
   assets.push(...assets, ...assets, ...assets);
 
   {
@@ -152,10 +160,13 @@ export const InitGame = async (ctx: CanvasRenderingContext2D) => {
         if (o.x < 0 || o.y < 0 || o.x > 14 || o.y > 14) space.delete(s);
       });
     }
+    CalcClickable();
   }
 
   ctx.canvas.addEventListener('pointermove', handlePointer(ctx, false));
   ctx.canvas.addEventListener('pointerdown', handlePointer(ctx, true));
+  init.loadedMs = Date.now();
+  Render(ctx);
 };
 
 const RenderTile = (
@@ -236,8 +247,10 @@ const RenderTile = (
   ctx.restore();
 };
 
-let introduction = 0;
-export const Render = (ctx: CanvasRenderingContext2D) => {
+let renderKey = '';
+export const Render = (ctx: CanvasRenderingContext2D, key?: string) => {
+  if (key && renderKey === key) return;
+  renderKey = key ?? '';
   ctx.fillStyle = '#132a3d';
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
@@ -258,7 +271,7 @@ export const Render = (ctx: CanvasRenderingContext2D) => {
   ctx.fillStyle = '#654321';
   ctx.strokeStyle = '#442d15';
   ctx.lineWidth = 2;
-  const troughSlots = difficulty === 'hard' ? 4 : 3;
+  const troughSlots = init.difficulty === 'hard' ? 4 : 3;
   const troughWidth = (tileWidth + margin * 2) * troughSlots;
   const troughX = gameWidth / 2 - troughWidth / 2;
   const tileSpace = tileWidth + margin * 2;
@@ -274,8 +287,8 @@ export const Render = (ctx: CanvasRenderingContext2D) => {
   }
   ctx.translate(margin, margin * 2 + troughHeight);
 
-  const toDraw =
-    introduction !== board.length ? board.slice(0, ++introduction) : board;
+  const numDraw = (Date.now() - init.loadedMs) / 10;
+  const toDraw = board.slice(0, numDraw);
   const sorted = toDraw.toSorted((a, b) => {
     if (a.z > b.z) return 1;
     if (a.z < b.z) return -1;
@@ -290,4 +303,6 @@ export const Render = (ctx: CanvasRenderingContext2D) => {
   });
 
   ctx.restore();
+
+  if (numDraw < board.length) requestAnimationFrame(() => Render(ctx));
 };
