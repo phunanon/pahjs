@@ -1,6 +1,7 @@
 const { floor, random, min, max, hypot } = Math;
 const assets: HTMLImageElement[] = [];
 
+type Ctx = CanvasRenderingContext2D;
 type Tile = {
   asset: HTMLImageElement;
   clickable?: boolean;
@@ -18,7 +19,6 @@ type BoardTile = Tile & {
 let difficulty: 'easy' | 'hard' = 'easy';
 const trough: Tile[] = [];
 const board: BoardTile[] = [];
-const mouse = { x: 0, y: 0, clicked: false };
 
 const boardLength = 8;
 const tileWidth = 64;
@@ -37,6 +37,65 @@ const shuffle = <T>(xs: T[], k = 0) => {
     xs[i] = xs[j]!;
     xs[j] = temp;
     alreadyShuffled.add(j);
+  }
+};
+
+const handlePointer = (ctx: Ctx, click: boolean) => (e: PointerEvent) => {
+  //TODO: this could be done only once the board changes
+  for (const tile of board) {
+    const topBlocked = board.some(
+      other =>
+        other.z === tile.z + 1 &&
+        other.x >= tile.x - 1 &&
+        other.x <= tile.x + 1 &&
+        other.y >= tile.y - 1 &&
+        other.y <= tile.y + 1,
+    );
+    const neighbours = board.filter(
+      other =>
+        other != tile &&
+        other.z === tile.z &&
+        other.y === tile.y &&
+        (other.x + 2 === tile.x || other.x - 2 === tile.x),
+    );
+    tile.clickable = !topBlocked && neighbours.length < 2;
+  }
+
+  const rect = ctx.canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (ctx.canvas.width / rect.width);
+  const y = (e.clientY - rect.top) * (ctx.canvas.height / rect.height);
+  //Figure out which tile is under the mouse
+  const underMouse = board
+    .filter(x => x.clickable)
+    .reduce(
+      (under, tile) => {
+        tile.highlight = false;
+        const isUnder =
+          x >= tile.clientLeft &&
+          x <= tile.clientRight &&
+          y >= tile.clientTop &&
+          y <= tile.clientBottom;
+        if (!isUnder) return under;
+        if (under) return tile.z > under.z ? tile : under;
+        return tile;
+      },
+      null as BoardTile | null,
+    );
+  if (underMouse) underMouse.highlight = true;
+
+  if (click && underMouse?.clickable) {
+    const { asset } = underMouse;
+    const boardIdx = board.indexOf(underMouse);
+    const troughIdx = trough.findIndex(t => t.asset.src === asset.src);
+    if (troughIdx === -1) {
+      if (trough.length === (difficulty ? 4 : 3)) {
+        return;
+      }
+      trough.push({ asset });
+    } else {
+      trough.splice(troughIdx, 1);
+    }
+    board.splice(boardIdx, 1);
   }
 };
 
@@ -95,15 +154,8 @@ export const InitGame = async (ctx: CanvasRenderingContext2D) => {
     }
   }
 
-  ctx.canvas.addEventListener('pointermove', e => {
-    const rect = ctx.canvas.getBoundingClientRect();
-    mouse.x = (e.clientX - rect.left) * (ctx.canvas.width / rect.width);
-    mouse.y = (e.clientY - rect.top) * (ctx.canvas.height / rect.height);
-  });
-  ctx.canvas.addEventListener('pointerdown', () => {
-    mouse.clicked = true;
-  });
-  CalcClickable();
+  ctx.canvas.addEventListener('pointermove', handlePointer(ctx, false));
+  ctx.canvas.addEventListener('pointerdown', handlePointer(ctx, true));
 };
 
 const RenderTile = (
@@ -184,52 +236,8 @@ const RenderTile = (
   ctx.restore();
 };
 
-const CalcClickable = () => {
-  for (const tile of board) {
-    const topBlocked = board.some(
-      other =>
-        other.z === tile.z + 1 &&
-        other.x >= tile.x - 1 &&
-        other.x <= tile.x + 1 &&
-        other.y >= tile.y - 1 &&
-        other.y <= tile.y + 1,
-    );
-    const neighbours = board.filter(
-      other =>
-        other != tile &&
-        other.z === tile.z &&
-        other.y === tile.y &&
-        (other.x + 2 === tile.x || other.x - 2 === tile.x),
-    );
-    tile.clickable = !topBlocked && neighbours.length < 2;
-  }
-};
-
-const HandleClick = () => {
-  const clicked = board.find(tile => tile.highlight);
-  if (!clicked?.clickable) return;
-  const boardIdx = board.indexOf(clicked);
-  const troughIdx = trough.findIndex(t => t.asset.src === clicked.asset.src);
-  if (troughIdx === -1) {
-    if (trough.length === (difficulty ? 4 : 3)) {
-      return;
-    }
-    trough.push({ asset: clicked.asset });
-  } else {
-    trough.splice(troughIdx, 1);
-  }
-  board.splice(boardIdx, 1);
-};
-
 let introduction = 0;
 export const Render = (ctx: CanvasRenderingContext2D) => {
-  //Handle click
-  if (mouse.clicked) {
-    mouse.clicked = false;
-    HandleClick();
-    CalcClickable();
-  }
-
   ctx.fillStyle = '#132a3d';
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
@@ -265,25 +273,6 @@ export const Render = (ctx: CanvasRenderingContext2D) => {
     ctx.restore();
   }
   ctx.translate(margin, margin * 2 + troughHeight);
-
-  //Figure out which tile is under the mouse
-  const underMouse = board
-    .filter(x => x.clickable)
-    .reduce(
-      (under, tile) => {
-        tile.highlight = false;
-        const isUnder =
-          mouse.x >= tile.clientLeft &&
-          mouse.x <= tile.clientRight &&
-          mouse.y >= tile.clientTop &&
-          mouse.y <= tile.clientBottom;
-        if (!isUnder) return under;
-        if (under) return tile.z > under.z ? tile : under;
-        return tile;
-      },
-      null as BoardTile | null,
-    );
-  if (underMouse) underMouse.highlight = true;
 
   const toDraw =
     introduction !== board.length ? board.slice(0, ++introduction) : board;
